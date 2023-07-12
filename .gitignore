@@ -1,0 +1,5 @@
+.DS_Store
+.vscode/
+CMakeFiles/
+data/phone_geo_time.csv
+CMakeCache.txt
