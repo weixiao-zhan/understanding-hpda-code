@@ -126,6 +126,10 @@ public:
     return *this;
   }
 
+    auto get_m_content() -> std::shared_ptr<content_type> {
+        return m_content;
+    }
+
 protected:
   template <typename OT, typename CT>
   auto assign_helper(const OT &data) -> typename std::enable_if<

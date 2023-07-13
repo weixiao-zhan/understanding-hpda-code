@@ -1,0 +1,2 @@
+add_executable(ntobject_compile_check ntobject_compile_check.cpp)
+target_link_libraries(ntobject_compile_check hpda ff_net)

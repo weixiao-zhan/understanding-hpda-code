@@ -3,3 +3,7 @@
 CMakeFiles/
 data/phone_geo_time.csv
 CMakeCache.txt
+bin/
+build/
+lib/
+doc_example/3.4/data/phone_geo_time.csv

@@ -11,6 +11,4 @@ link_directories(${PROJECT_SOURCE_DIR}/lib)
 
 add_subdirectory(hpda)
 add_subdirectory(fflib)
-
-add_executable(MYClass MYClass.cpp)
-target_link_libraries(MYClass hpda ff_net)
+add_subdirectory(doc_example)
