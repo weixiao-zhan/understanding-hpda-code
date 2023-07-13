@@ -18,6 +18,30 @@ define_nt(my_data, mydata_t, "mydata");
 
 typedef ff::net::ntpackage<112, name, uid, email, my_type, my_strings, my_data> mypackage;
 
+namespace ff
+{
+    namespace net
+    {
+        template <>
+        class archive_helper<mydata_t>
+        {
+        public:
+            static uint32_t serialize(char *buf, const mydata_t &d, size_t len)
+            {
+                memcpy(buf, (const char *)&d, sizeof(d));
+                return sizeof(d);
+            }
+            static uint32_t deserialize(const char *buf, mydata_t &d, size_t len)
+            {
+                memcpy((char *)&d, buf, sizeof(d));
+                return sizeof(d);
+            }
+            static uint32_t length(mydata_t &d) { return sizeof(d); }
+        };
+    } // namespace net
+} // namespace ff
+
+
 int main()
 {
     mypackage orig_pkg;
