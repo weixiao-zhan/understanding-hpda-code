@@ -2,8 +2,8 @@ import csv
 import random
 from faker import Faker
 
-PHONE_NUM = 100
-ENTRY_NUM = 100
+PHONE_NUM = 5
+ENTRY_NUM = 10
 
 def generate_to_csv(filename):
     with open(filename, mode='w', newline='') as file:
