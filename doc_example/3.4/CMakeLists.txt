@@ -1,2 +1,2 @@
-add_executable(app app.cpp)
-target_link_libraries(app hpda ff_net glog)
+add_executable(spliter spliter.cpp)
+target_link_libraries(spliter hpda ff_net glog boost_program_options boost_system -lpthread)
