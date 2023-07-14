@@ -11,5 +11,5 @@ define_nt(timestamp, long long int);
 
 define_nt(idx, long long int);
 typedef ff::net::ntpackage<0, idx> client_request_msg;
-typedef ff::net::ntpackage<2, phone_number, longitude, latitude, timestamp> nt_data_entry;
+typedef ff::net::ntpackage<2, idx, phone_number, longitude, latitude, timestamp> nt_data_entry;
 typedef ff::net::ntpackage<3> nt_no_data_entry;

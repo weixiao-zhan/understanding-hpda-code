@@ -6,7 +6,7 @@ class cvs_extractor : public hpda::extractor::raw_data<phone_number, longitude, 
 {
 public:
     cvs_extractor(const std::string &filename)
-        :raw_data_impl()
+        :hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>()
     {
         file.open(filename);
         if (!file.is_open())
@@ -100,7 +100,7 @@ public:
         pnn->add_pkg_hub(pkghub);
         pnn->add_tcp_server("127.0.0.1", port);
         pnn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
-            std::bind(&output_server::on_lost_TCP_connection, this, std::placeholders::_1));
+            std::bind(&output_server::on_conn_lost, this, std::placeholders::_1));
     }
 
     virtual void run()
@@ -111,28 +111,29 @@ public:
     }
 private:
     void on_recv_client_request(std::shared_ptr<client_request_msg> msg,
-                    ff::net::tcp_connection_base *from) {
+                    ff::net::tcp_connection_base *client) {
 
         auto i = msg->template get<idx>();
         if (i < m_data.size()) {
             std::shared_ptr<nt_data_entry> pkg=std::make_shared<nt_data_entry>();
             (*pkg) = m_data[i];
-            std::cout<< "sent data[" << i << "]" << std::endl;
+            client->send(pkg);
+            std::cout<< "sent data [" << i << "]" << std::endl;
         } else {
             std::shared_ptr<nt_no_data_entry> pkg(new nt_no_data_entry());
-            from->send(pkg);
-            std::cout<< "sent no data" << i << "]" << std::endl;
+            client->send(pkg);
+            std::cout<< "sent no data for index [" << i << "]" << std::endl;
         }
     }
 
-    void on_lost_TCP_connection(ff::net::tcp_connection_base *pConn)
+    void on_conn_lost(ff::net::tcp_connection_base *client)
     {
         ff::net::mout << "lost connection!" << std::endl;
     }
 
     void press_and_stop()
     {
-        ff::net::mout << "Press any key to quit..." << std::endl;
+        ff::net::mout << "Press any key to quit server ..." << std::endl;
         std::cin.get();
         pnn->stop();
         ff::net::mout << "Stopping, please wait..." << std::endl;
@@ -163,7 +164,6 @@ int main(int argc, char *argv[])
     hash_spliter hs(&ce);
     hs.set_engine(&engine);
 
-    engine.run();
 
 /*
     hpda::output::memory_output<phone_number, longitude, latitude, timestamp> checker1( hs.new_split_stream() );
@@ -180,10 +180,21 @@ int main(int argc, char *argv[])
     }
 */    
 
-    ff::net::application app("pingpong");
+    ff::net::application app("spliter");
+    char *arguments[] = {
+        "../bin/spliter",
+        "--routine",
+        "spliter.output_server",
+        nullptr
+    };
+    int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
+    app.initialize(my_argc, arguments);
     app.initialize(argc, argv);
-    output_server s(hs.new_split_stream(), 8001);
+    output_server s(hs.new_split_stream(), 8002);
     app.register_routine(&s);
+    s.set_engine(&engine);
+
+    engine.run();
     app.run();
     return 0;
 }
