@@ -23,10 +23,8 @@ typedef ff::util::ntobject<phone_number, distance> NTO_distance_entry;
 
 define_nt(idx, long long int);
 define_nt(data_entry, NTO_data_entry);
-typedef ff::net::ntpackage<0, idx> client_request_msg;
 typedef ff::net::ntpackage<2, idx, data_entry> NTP_data_entry;
-typedef ff::net::ntpackage<3> NTP_no_data_entry;
-
+typedef ff::net::ntpackage<3> NTP_no_more_data_flag;
 
 namespace ff { namespace net
 {

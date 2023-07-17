@@ -73,70 +73,82 @@ protected:
     std::hash<int> hashFunc;
 };
 
-//class output_server: 
-class output_server 
+//class output_client: 
+class output_client 
     : public hpda::output::internal::memory_output_impl<NTO_data_entry>, 
       public ff::net::routine
 {
 public:
-    output_server(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream, int port) 
+    output_client(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream, int port) 
         : hpda::output::internal::memory_output_impl<NTO_data_entry>(upper_stream),
-          ff::net::routine("spliter.output_server"),
+          ff::net::routine("spliter.output_client"),
           port(port)
     {   }
 
     virtual void initialize(ff::net::net_mode nm, const std::vector<std::string> &args)
     {
-        pkghub.tcp_to_recv_pkg<client_request_msg>(std::bind(&output_server::on_recv_client_request, this,
-                                                   std::placeholders::_1,
-                                                   std::placeholders::_2));
-
-        pnn = new ff::net::net_nervure(nm);
-        pnn->add_pkg_hub(pkghub);
-        pnn->add_tcp_server("127.0.0.1", port);
-        pnn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
-            std::bind(&output_server::on_conn_lost, this, std::placeholders::_1));
+        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&output_client::on_recv_no_data, this,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2));
+        netn = new ff::net::net_nervure(nm);
+        netn->add_pkg_hub(pkghub);
+        netn->add_tcp_client("127.0.0.1", port);
+        netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
+            std::bind(&output_client::on_conn_succ, this, std::placeholders::_1));
+        netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
+            std::bind(&output_client::on_conn_lost, this, std::placeholders::_1));
     }
 
     virtual void run()
     {
-        std::thread monitor_thrd(std::bind(&output_server::press_and_stop, this));
-        pnn->run();
-        monitor_thrd.join();
+        netn->run();
     }
 private:
-    void on_recv_client_request(std::shared_ptr<client_request_msg> msg,
-                    ff::net::tcp_connection_base *client) {
-        auto i = msg->template get<idx>();
-        if (i < m_data.size()) {
+    void send_data(ff::net::tcp_connection_base *server) {
+        for (NTO_data_entry data : m_data) {
             std::shared_ptr<NTP_data_entry> pkg = std::make_shared<NTP_data_entry>();
-            (*pkg).set<idx>(i);
-            (*pkg).set<data_entry>(m_data[i]);
-            client->send(pkg);
-            std::cout<< "sent data [" << i << "]" << std::endl;
-        } else {
-            std::shared_ptr<NTP_no_data_entry> pkg(new NTP_no_data_entry());
-            client->send(pkg);
-            std::cout<< "sent no data for index [" << i << "]" << std::endl;
+            (*pkg).set<data_entry>(data);
+            server->send(pkg);
+            std::cout<< "sent data [" << data.get<phone_number>() << "]" << std::endl;
         }
+        
+        std::shared_ptr<NTP_no_more_data_flag> pkg(new NTP_no_more_data_flag());
+        server->send(pkg);
+        std::cout<< "sent end flag" << std::endl;
     }
 
-    void on_conn_lost(ff::net::tcp_connection_base *client)
+    void on_recv_no_data(std::shared_ptr<NTP_no_more_data_flag> msg,
+                    ff::net::tcp_connection_base *server)
+    {
+        done_transfer.store(true);
+    }
+
+    void on_conn_succ(ff::net::tcp_connection_base *server)
+    {
+        ff::net::mout << "connect success, sending data ..." << std::endl;
+        send_data(server);
+    }
+
+    void on_conn_lost(ff::net::tcp_connection_base *server)
     {
         ff::net::mout << "lost connection!" << std::endl;
     }
 
-    void press_and_stop()
-    {
-        ff::net::mout << "Press any key to quit server ..." << std::endl;
-        std::cin.get();
-        pnn->stop();
-        ff::net::mout << "Stopping, please wait..." << std::endl;
-    }
+    void done_transfer_and_close_conn() {
+        while(!done_transfer.load()) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        // done transfer;
+        netn->stop();
+    } 
+
+
 protected:
+    std::atomic<bool> done_transfer;
+
     int port;
     ff::net::typed_pkg_hub pkghub;
-    ff::net::net_nervure *pnn;
+    ff::net::net_nervure *netn;
 };
 
 
@@ -179,13 +191,13 @@ int main(int argc, char *argv[])
     char *arguments[] = {
         "../bin/spliter",
         "--routine",
-        "spliter.output_server",
+        "spliter.output_client",
         nullptr
     };
     int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
     app.initialize(my_argc, arguments);
     app.initialize(argc, argv);
-    output_server s(hs.new_split_stream(), 8002);
+    output_client s(hs.new_split_stream(), 8002);
     app.register_routine(&s);
     s.set_engine(&engine);
 
