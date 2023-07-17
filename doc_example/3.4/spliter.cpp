@@ -2,32 +2,26 @@
 #include "hpda/processor/transform/split.h"
 
 // starting with a csv file reader
-class cvs_extractor : public hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>
+class cvs_extractor : public hpda::extractor::internal::raw_data_impl<NTO_data_entry>
 {
 public:
     cvs_extractor(const std::string &filename)
-        :hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>()
+        :hpda::extractor::internal::raw_data_impl<NTO_data_entry>()
     {
         file.open(filename);
         if (!file.is_open())
         {
             throw std::runtime_error("Could not open file");
         }
-        read_file();
     }
     ~cvs_extractor()
     {
         file.close();
     }
 
-private:
-    std::ifstream file;
-
-    void read_file()
-    {
+    bool process() override {
         std::string line;
-        
-        while (std::getline(file, line))
+        if (std::getline(file, line))
         {
             std::istringstream s(line);
 
@@ -38,24 +32,28 @@ private:
                 fields.push_back(field);
             }
 
+            NTO_loc_info one_loc_info;
+            one_loc_info.set<longitude, latitude, timestamp>(
+                std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3])); 
 
-            typedef ff::util::ntobject<phone_number, longitude, latitude, timestamp> data_entry; // local use
-            data_entry one_entry;
+            NTO_data_entry one_entry;
             one_entry.set<phone_number>(std::stoll(fields[0]));
-            one_entry.set<longitude>(std::stof(fields[1]));
-            one_entry.set<latitude>(std::stof(fields[2]));
-            one_entry.set<timestamp>(std::stoll(fields[3]));
-
-            m_data.push_back(one_entry);
+            one_entry.set<loc_info>(one_loc_info);
+            hpda::extractor::internal::raw_data_impl<NTO_data_entry>::add_data(one_entry);
         }
+        return hpda::extractor::internal::raw_data_impl<NTO_data_entry>::process();
     }
+
+private:
+    std::ifstream file;
 };
 
-class hash_spliter : public hpda::processor::split<phone_number, longitude, latitude, timestamp>
+
+class hash_spliter : public hpda::processor::internal::split_impl<NTO_data_entry>
 {
 public:
-    hash_spliter(hpda::processor_with_output<phone_number, longitude, latitude, timestamp> *upper_stream)
-        : hpda::processor::split<phone_number, longitude, latitude, timestamp>(upper_stream)
+    hash_spliter(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream)
+        : hpda::processor::internal::split_impl<NTO_data_entry>(upper_stream)
     {    }
 
     bool process() override
@@ -64,9 +62,8 @@ public:
         {
             return false;
         }
-        auto t = base::input_value();
+        NTO_data_entry t = base::input_value();
         size_t hashValue = hashFunc(t.get<phone_number>());
-
         m_streams[hashValue%m_streams.size()]->add_data(t.make_copy());
         consume_input_value();
         return true;
@@ -76,19 +73,17 @@ protected:
     std::hash<int> hashFunc;
 };
 
-
 //class output_server: 
 class output_server 
-    : public hpda::output::memory_output<phone_number, longitude, latitude, timestamp>, 
+    : public hpda::output::internal::memory_output_impl<NTO_data_entry>, 
       public ff::net::routine
 {
 public:
-    output_server(hpda::processor_with_output<phone_number, longitude, latitude, timestamp> *upper_stream, int port) 
-        : hpda::output::memory_output<phone_number, longitude, latitude, timestamp>(upper_stream),
+    output_server(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream, int port) 
+        : hpda::output::internal::memory_output_impl<NTO_data_entry>(upper_stream),
           ff::net::routine("spliter.output_server"),
           port(port)
     {   }
-
 
     virtual void initialize(ff::net::net_mode nm, const std::vector<std::string> &args)
     {
@@ -112,15 +107,15 @@ public:
 private:
     void on_recv_client_request(std::shared_ptr<client_request_msg> msg,
                     ff::net::tcp_connection_base *client) {
-
         auto i = msg->template get<idx>();
         if (i < m_data.size()) {
-            std::shared_ptr<nt_data_entry> pkg=std::make_shared<nt_data_entry>();
-            (*pkg) = m_data[i];
+            std::shared_ptr<NTP_data_entry> pkg = std::make_shared<NTP_data_entry>();
+            (*pkg).set<idx>(i);
+            (*pkg).set<data_entry>(m_data[i]);
             client->send(pkg);
             std::cout<< "sent data [" << i << "]" << std::endl;
         } else {
-            std::shared_ptr<nt_no_data_entry> pkg(new nt_no_data_entry());
+            std::shared_ptr<NTP_no_data_entry> pkg(new NTP_no_data_entry());
             client->send(pkg);
             std::cout<< "sent no data for index [" << i << "]" << std::endl;
         }
@@ -151,34 +146,34 @@ int main(int argc, char *argv[])
 
     cvs_extractor ce("../doc_example/3.4/data/phone_geo_time.csv");
     ce.set_engine(&engine);
-/*
-    hpda::output::internal::memory_output_impl<data_entry> checker( &ce );
+    /*
+    hpda::output::internal::memory_output_impl<NTO_data_entry> checker( &ce );
     engine.run();
     std::cout << checker.values().size() << std::endl;
     for (auto v : checker.values()) {
-        std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<timestamp>()  << std::endl;
+        std::cout << v.get<phone_number>() << std::endl;
     }
-*/
+    */
+
 
     hash_spliter hs(&ce);
     hs.set_engine(&engine);
 
-
-/*
-    hpda::output::memory_output<phone_number, longitude, latitude, timestamp> checker1( hs.new_split_stream() );
-    hpda::output::memory_output<phone_number, longitude, latitude, timestamp> checker2( hs.new_split_stream() );
+    /*
+    hpda::output::internal::memory_output_impl<NTO_data_entry> checker1( hs.new_split_stream() );
+    hpda::output::internal::memory_output_impl<NTO_data_entry> checker2( hs.new_split_stream() );
+    engine.run();
     std::cout << "size" << checker1.values().size() << std::endl;
     for (auto v : checker1.values()) {
         std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<timestamp>()  << std::endl;
+        std::cout << v.get<loc_info>().get<timestamp>()  << std::endl;
     }
     std::cout << "size" << checker2.values().size() << std::endl;
     for (auto v : checker2.values()) {
         std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<timestamp>()  << std::endl ;
+        std::cout << v.get<loc_info>().get<timestamp>()  << std::endl ;
     }
-*/    
+    */
 
     ff::net::application app("spliter");
     char *arguments[] = {
@@ -196,5 +191,5 @@ int main(int argc, char *argv[])
 
     engine.run();
     app.run();
-    return 0;
+    return 0; 
 }

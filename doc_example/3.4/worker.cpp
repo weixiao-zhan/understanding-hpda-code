@@ -2,13 +2,13 @@
 #include <atomic>
 
 class extract_client 
-    : public hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>,
+    : public hpda::extractor::internal::raw_data_impl<NTO_data_entry>,
       public ff::net::routine 
 {
 public:
     extract_client(int port)
     : ff::net::routine("worker.extract_client"),
-      hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>(),
+      hpda::extractor::internal::raw_data_impl<NTO_data_entry>(),
       done_transfer(false),
       port(port)
     {    }
@@ -16,10 +16,10 @@ public:
     virtual void initialize(ff::net::net_mode nm,
                             const std::vector<std::string> &args)
     {
-        pkghub.tcp_to_recv_pkg<nt_data_entry>(std::bind(&extract_client::on_recv_data, this,
+        pkghub.tcp_to_recv_pkg<NTP_data_entry>(std::bind(&extract_client::on_recv_data, this,
                                                    std::placeholders::_1,
                                                    std::placeholders::_2));
-        pkghub.tcp_to_recv_pkg<nt_no_data_entry>(std::bind(&extract_client::on_recv_no_data, this,
+        pkghub.tcp_to_recv_pkg<NTP_no_data_entry>(std::bind(&extract_client::on_recv_no_data, this,
                                             std::placeholders::_1,
                                             std::placeholders::_2));
 
@@ -39,7 +39,7 @@ public:
     }
 
     bool process() override {
-        return done_transfer && hpda::extractor::raw_data<phone_number, longitude, latitude, timestamp>::process();
+        return done_transfer && hpda::extractor::internal::raw_data_impl<NTO_data_entry>::process();
     }
 
 protected:
@@ -51,21 +51,17 @@ protected:
         server->send(req_msg);
     }
 
-    void on_recv_data(std::shared_ptr<nt_data_entry> nt_data,
+    void on_recv_data(std::shared_ptr<NTP_data_entry> nt_data,
                     ff::net::tcp_connection_base *server)
     {
-        typedef ff::util::ntobject<phone_number, longitude, latitude, timestamp> data_entry;
-        data_entry data;
-        data.set<phone_number>(nt_data-> template get<phone_number>());
-        data.set<longitude>(nt_data-> template get<longitude>());
-        data.set<latitude>(nt_data-> template get<latitude>());
-        data.set<timestamp>(nt_data-> template get<timestamp>());
+        NTO_data_entry data;
+        data = nt_data-> template get<data_entry>();
         add_data(data);
         std::cout << "got data: " << data.get<phone_number>() << std::endl;
         send_request(server);
     }
 
-    void on_recv_no_data(std::shared_ptr<nt_no_data_entry> msg,
+    void on_recv_no_data(std::shared_ptr<NTP_no_data_entry> msg,
                     ff::net::tcp_connection_base *server)
     {
         done_transfer.store(true);
@@ -118,7 +114,7 @@ int main(int argc, char *argv[])
     app.register_routine(&c);
     c.set_engine(&engine);
 
-    hpda::output::memory_output<phone_number, longitude, latitude, timestamp> checker( &c );
+    hpda::output::internal::memory_output_impl<NTO_data_entry> checker( &c );
     
     app.run();
     
@@ -127,6 +123,9 @@ int main(int argc, char *argv[])
     std::cout << checker.values().size() << std::endl;
     for (auto v : checker.values()) {
         std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<timestamp>()  << std::endl;
+        std::cout << v.get<loc_info>().get<longitude>() << "," \
+            << v.get<loc_info>().get<latitude>() << "," \
+            << v.get<loc_info>().get<timestamp>() << "," \
+          << std::endl;
     }
 }
