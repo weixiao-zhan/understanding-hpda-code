@@ -255,6 +255,68 @@ private:
     }
 };
 
+class max_n
+    : public hpda::processor::internal::processor_base<NTO_distance_entry, NTO_distance_entry>
+{
+public:
+    max_n(hpda::internal::processor_with_output<NTO_distance_entry> *upper_stream, uint size_limit)
+        : hpda::processor::internal::processor_base<NTO_distance_entry, NTO_distance_entry>(upper_stream),
+          size_limit(size_limit)
+    {   }
+
+    bool process() override {
+        if(has_input_value()){
+            insert(max_n_data, input_value());
+            if(max_n_data.size() > size_limit) {
+                max_n_data.pop_back();
+            }
+
+            consume_input_value();
+            return false;
+        }
+        if(max_n_data.empty()) {
+            return false;
+        }
+        output_idx++;
+        if (output_idx >= max_n_data.size()) {
+            return false;
+        }
+        return true;
+    }
+
+    NTO_distance_entry output_value() override {
+        return max_n_data[output_idx];
+    } 
+
+private:
+    void insert(std::vector<NTO_distance_entry>& l, NTO_distance_entry new_item) {
+        l.push_back(new_item.make_copy());
+        int i = l.size()-2;
+        std::cout << new_item.get<distance>() << std::endl;
+        while(i>=0) {
+            if(l[i].get<distance>() < new_item.get<distance>()){
+                l[i+1] = l[i].make_copy();
+            } else {
+                break;
+            }
+            i--;
+        }
+        i++; //the place to actually insert
+        if(i>=0){
+            l[i] = new_item.make_copy();
+        }
+        return;
+    }
+
+    static bool compare_by_distance(const NTO_distance_entry& a, const NTO_distance_entry& b) {
+        return a.get<distance>() > b.get<distance>();    // descending order
+    }
+
+    std::vector<NTO_distance_entry> max_n_data;
+    uint output_idx = -1;
+    uint size_limit;
+};
+
 
 int main(int argc, char *argv[])
 {
@@ -276,8 +338,9 @@ int main(int argc, char *argv[])
 
     groupby_and_sort gs(&es);
     cal_distance cd(&gs);
+    max_n mn(&cd, 5);
 
-    hpda::output::internal::memory_output_impl<NTO_distance_entry> checker( &cd );
+    hpda::output::internal::memory_output_impl<NTO_distance_entry> checker( &mn );
     
     app.run();
     engine.run();
