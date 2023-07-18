@@ -13,7 +13,7 @@ int main() {
         rd.add_data(d);
     }
 
-    netout<NTO_data_entry> no(&rd);
+    to_net<NTO_data_entry> no(&rd);
     no.set_engine(&engine);
 
     engine.run();

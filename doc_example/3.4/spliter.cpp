@@ -109,10 +109,10 @@ int main(int argc, char *argv[])
     }
     */
 
-    netout<NTO_data_entry> no(hs.new_split_stream());
-    no.set_engine(&engine);
+    to_net<NTO_data_entry> tn(hs.new_split_stream());
+    tn.set_engine(&engine);
 
     engine.run();
-    no.hpda_engine_complete();
+    tn.hpda_engine_complete();
     return 0;
 }

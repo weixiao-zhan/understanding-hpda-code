@@ -4,9 +4,9 @@
 
 typedef ff::net::ntpackage<3> NTP_no_more_data_flag; // using a magic UID
 
-//class netout:
+//class to_net:
 template <typename InputObjType>
-class netout 
+class to_net 
     : public hpda::internal::processor_with_input<InputObjType>, 
       public ff::net::routine
 {
@@ -14,14 +14,14 @@ define_nt(payload, InputObjType);
 typedef ff::net::ntpackage<0, payload> NTP_data;
 
 public:
-    netout(hpda::internal::processor_with_output<InputObjType> *upper_stream, 
-            std::string ip="127.0.0.1", int port = 8000, char* routine_name="netout") 
+    to_net(hpda::internal::processor_with_output<InputObjType> *upper_stream, 
+            std::string ip="127.0.0.1", int port = 8000, char* routine_name="to_net") 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
           ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
           first_process(true), conn_setup(false), done_transfer(false)
     {   }
 
-    ~netout()
+    ~to_net()
     {
 
         netapp_thrd->join();
@@ -30,16 +30,16 @@ public:
 
     virtual void initialize(ff::net::net_mode nm, const std::vector<std::string> &args)
     {
-        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&netout::on_recv_end_flag, this,
+        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&to_net::on_recv_end_flag, this,
                                     std::placeholders::_1,
                                     std::placeholders::_2));
         netn = new ff::net::net_nervure(nm);
         netn->add_pkg_hub(pkghub);
         netn->add_tcp_client(ip, port);
         netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
-            std::bind(&netout::on_conn_succ, this, std::placeholders::_1));
+            std::bind(&to_net::on_conn_succ, this, std::placeholders::_1));
         netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
-            std::bind(&netout::on_conn_lost, this, std::placeholders::_1));
+            std::bind(&to_net::on_conn_lost, this, std::placeholders::_1));
     }
 
     virtual void run()
@@ -50,7 +50,7 @@ public:
     bool process() override 
     {
         if (first_process) {
-            netapp_thrd = new std::thread(std::bind(&netout::do_net_app_initialization, this));
+            netapp_thrd = new std::thread(std::bind(&to_net::do_net_app_initialization, this));
             first_process = false;
         }
         while(!conn_setup.load()){
@@ -72,7 +72,7 @@ public:
 
 private:
     void do_net_app_initialization() {
-        app = new ff::net::application("netout");
+        app = new ff::net::application("to_net");
         char *arguments[] = {
             "binary place holder",
             "--routine",
@@ -101,6 +101,7 @@ private:
     void on_recv_end_flag(std::shared_ptr<NTP_no_more_data_flag> msg,
                     ff::net::tcp_connection_base *server)
     {
+        std::cout << "got ack end flag" << std::endl;
         done_transfer.store(true);
     }
 
@@ -113,7 +114,7 @@ private:
 
     void on_conn_lost(ff::net::tcp_connection_base *server)
     {
-        ff::net::mout << "lost connection!" << std::endl;
+        ff::net::mout << "connection closed!" << std::endl;
     }
 
 protected:
@@ -132,7 +133,7 @@ protected:
 };
 
 template <typename OutputObjType>
-class netin 
+class from_net 
     : public hpda::internal::processor_with_output<OutputObjType>,
       public ff::net::routine 
 {
@@ -140,13 +141,13 @@ define_nt(payload, OutputObjType);
 typedef ff::net::ntpackage<0, payload> NTP_data;
 
 public:
-    netin(std::string ip="127.0.0.1", int port = 8000, char* routine_name="netin")
+    from_net(std::string ip="127.0.0.1", int port = 8000, char* routine_name="from_net")
     : hpda::internal::processor_with_output<OutputObjType>(),
       ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
       first_process(true), conn_setup(false), done_transfer(false)
     {    }
 
-    ~netin()
+    ~from_net()
     {
         netapp_thrd->join();
         delete app;
@@ -155,10 +156,10 @@ public:
     virtual void initialize(ff::net::net_mode nm,
                             const std::vector<std::string> &args)
     {
-        pkghub.tcp_to_recv_pkg<NTP_data>(std::bind(&netin::on_recv_data, this,
+        pkghub.tcp_to_recv_pkg<NTP_data>(std::bind(&from_net::on_recv_data, this,
                                                    std::placeholders::_1,
                                                    std::placeholders::_2));
-        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&netin::on_recv_end_flag, this,
+        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&from_net::on_recv_end_flag, this,
                                             std::placeholders::_1,
                                             std::placeholders::_2));
 
@@ -166,20 +167,20 @@ public:
         netn->add_pkg_hub(pkghub);
         netn->add_tcp_server(ip, port);
         netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
-            std::bind(&netin::on_conn_succ, this, std::placeholders::_1));
+            std::bind(&from_net::on_conn_succ, this, std::placeholders::_1));
         netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
-            std::bind(&netin::on_conn_lost, this, std::placeholders::_1, netn));
+            std::bind(&from_net::on_conn_lost, this, std::placeholders::_1, netn));
     }
 
     virtual void run() { 
-        std::thread monitor_thrd(std::bind(&netin::done_transfer_and_close_conn, this));
+        std::thread monitor_thrd(std::bind(&from_net::done_transfer_and_close_conn, this));
         netn->run();
         monitor_thrd.join();
     }
 
     bool process() override {
         if(first_process){
-            netapp_thrd = new std::thread(std::bind(&netin::do_net_app_initialization, this));
+            netapp_thrd = new std::thread(std::bind(&from_net::do_net_app_initialization, this));
             first_process = false;
         }
         while (conn_setup.load()) {
@@ -202,7 +203,7 @@ public:
 
 protected:
     void do_net_app_initialization() {
-        app = new ff::net::application("netin");
+        app = new ff::net::application("from_net");
         char *arguments[] = {
             "binary place holder",
             "--routine",
@@ -230,7 +231,7 @@ protected:
         done_transfer.store(true);
         std::shared_ptr<NTP_no_more_data_flag> pkg(new NTP_no_more_data_flag());
         client->send(pkg);
-        std::cout<< "sent end flag" << std::endl;
+        std::cout<< "sent ack end flag" << std::endl;
     }
 
     void on_conn_succ(ff::net::tcp_connection_base *server)
@@ -249,9 +250,9 @@ protected:
         while(!done_transfer.load()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
-        std::cout << "cp: done transfer" << std::endl;
         // done transfer;
         netn->stop();
+        std::cout << "monitor_thrd: on transfer done, stopped net_app" << std::endl;
     } 
 
 protected:

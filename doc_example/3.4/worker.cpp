@@ -275,10 +275,10 @@ int main(int argc, char *argv[])
 {
     hpda::engine engine;
 
-    netin<NTO_data_entry> ni;
-    ni.set_engine(&engine);
+    from_net<NTO_data_entry> fn;
+    fn.set_engine(&engine);
 
-    groupby_and_sort gs(&ni);
+    groupby_and_sort gs(&fn);
     gs.set_engine(&engine);
 
     cal_distance cd(&gs);

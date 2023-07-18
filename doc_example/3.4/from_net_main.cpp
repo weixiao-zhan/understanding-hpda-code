@@ -3,7 +3,7 @@
 
 int main() {
     hpda::engine engine;
-    netin<NTO_data_entry> ni;
+    from_net<NTO_data_entry> ni;
     ni.set_engine(&engine);
 
     hpda::output::internal::memory_output_impl<NTO_data_entry> mo(&ni);
