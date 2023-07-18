@@ -196,7 +196,6 @@ int main(int argc, char *argv[])
     };
     int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
     app.initialize(my_argc, arguments);
-    app.initialize(argc, argv);
     output_client s(hs.new_split_stream(), 8002);
     app.register_routine(&s);
     s.set_engine(&engine);
