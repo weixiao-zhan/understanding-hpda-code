@@ -17,8 +17,8 @@ define_nt(nto_loc_info, ff::util::ntobject<longitude, latitude, timestamp> NTO_l
 */
 
 typedef ff::util::ntobject<phone_number, loc_info> NTO_data_entry;
-
-typedef ff::util::ntobject<phone_number, std::vector<loc_info>> NTO_sorted_data_entry;
+define_nt(loc_history, std::vector<NTO_loc_info>); // should I use define_NT field, or NTobject
+typedef ff::util::ntobject<phone_number, loc_history> NTO_grouped_data_entry;
 typedef ff::util::ntobject<phone_number, distance> NTO_distance_entry;
 
 define_nt(idx, long long int);
