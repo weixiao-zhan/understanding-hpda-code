@@ -109,10 +109,14 @@ int main(int argc, char *argv[])
     }
     */
 
-    to_net<NTO_data_entry> tn(hs.new_split_stream());
-    tn.set_engine(&engine);
+    to_net<NTO_data_entry> tn0(hs.new_split_stream(), "127.0.0.1", 8000);
+    to_net<NTO_data_entry> tn1(hs.new_split_stream(), "127.0.0.1", 8001);
+    
+    tn0.set_engine(&engine);
+    tn1.set_engine(&engine);
 
     engine.run();
-    tn.hpda_engine_complete();
+    tn0.hpda_engine_complete();
+    tn1.hpda_engine_complete();
     return 0;
 }

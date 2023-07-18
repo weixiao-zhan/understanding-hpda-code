@@ -79,10 +79,49 @@ namespace ff { namespace net
 
         static uint32_t length(NTO_data_entry &d) { 
             return \
-            sizeof(d.get<phone_number>() ) + \
-            sizeof(d.get<loc_info>().get<longitude>() ) + \
-            sizeof(d.get<loc_info>().get<latitude>() ) + \
-            sizeof(d.get<loc_info>().get<timestamp>());
+                sizeof(d.get<phone_number>() ) + \
+                sizeof(d.get<loc_info>().get<longitude>() ) + \
+                sizeof(d.get<loc_info>().get<latitude>() ) + \
+                sizeof(d.get<loc_info>().get<timestamp>());
+        }
+    };
+
+    template <>
+    class archive_helper<NTO_distance_entry>
+    {
+    public:
+        static uint32_t serialize(char *buf, const NTO_distance_entry &d, size_t len)
+        {
+            uint offset = 0;
+            auto f1 = d.get<phone_number>();
+            auto f2 = d.get<distance>();
+            
+            memcpy(buf+offset, &f1, sizeof(f1));
+            offset += sizeof(f1);
+            memcpy(buf+offset, &f2, sizeof(f2));
+            offset += sizeof(f2);
+            return offset;
+        }
+        static uint32_t deserialize(const char *buf, NTO_distance_entry &d, size_t len)
+        {
+            uint offset = 0;
+            ff::util::internal::nt_traits<phone_number>::type f1;
+            memcpy(&f1, buf+offset, sizeof(f1));
+            offset += sizeof(f1);
+            ff::util::internal::nt_traits<distance>::type f2;
+            memcpy(&f2, buf+offset, sizeof(f2));
+            offset += sizeof(f2);
+            
+            d.set<phone_number>(f1);
+            d.set<distance>(f2);
+            
+            return sizeof(d);
+        }
+
+        static uint32_t length(NTO_distance_entry &d) { 
+            return \
+                sizeof(d.get<phone_number>() ) + \
+                sizeof(d.get<distance>() );
         }
     };
 } }

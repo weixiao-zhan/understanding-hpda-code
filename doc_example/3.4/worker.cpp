@@ -275,7 +275,7 @@ int main(int argc, char *argv[])
 {
     hpda::engine engine;
 
-    from_net<NTO_data_entry> fn;
+    from_net<NTO_data_entry> fn("127.0.0.1", 8000);
     fn.set_engine(&engine);
 
     groupby_and_sort gs(&fn);
@@ -287,24 +287,26 @@ int main(int argc, char *argv[])
     max_n mn(&cd, 5);
     mn.set_engine(&engine);
 
-    hpda::output::internal::memory_output_impl<NTO_distance_entry> checker(&mn);
-    checker.set_engine(&engine);
+    to_net<NTO_distance_entry> tn(&mn, "127.0.0.1", 9000);
+    tn.set_engine(&engine);
 
     engine.run();
-
+    tn.hpda_engine_complete();
+/*
+    hpda::output::internal::memory_output_impl<NTO_distance_entry> checker(&mn);
+    checker.set_engine(&engine);
     std::cout << "size " << checker.values().size() << std::endl;
     for (auto v : checker.values())
     {
         std::cout << v.get<phone_number>() << "|";
         std::cout << v.get<distance>() << std::endl;
-        /*
         for (auto i : v.get<loc_history>()) {
             std::cout << "\t" << i.get<longitude>() << "," \
                 << i.get<latitude>() << "," \
                 << i.get<timestamp>() << "," \
                 << std::endl;
         }
-        */
         std::cout << std::endl;
     }
+*/
 }

@@ -4,6 +4,9 @@ target_link_libraries(spliter hpda ff_net glog boost_program_options boost_syste
 add_executable(worker worker.cpp)
 target_link_libraries(worker hpda ff_net glog boost_program_options boost_system -lpthread)
 
+add_executable(aggregater aggregater.cpp)
+target_link_libraries(aggregater hpda ff_net glog boost_program_options boost_system -lpthread)
+
 add_executable(from_net from_net_main.cpp)
 target_link_libraries(from_net hpda ff_net glog boost_program_options boost_system -lpthread)
 
