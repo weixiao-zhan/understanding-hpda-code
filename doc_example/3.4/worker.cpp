@@ -292,7 +292,6 @@ private:
     void insert(std::vector<NTO_distance_entry>& l, NTO_distance_entry new_item) {
         l.push_back(new_item.make_copy());
         int i = l.size()-2;
-        std::cout << new_item.get<distance>() << std::endl;
         while(i>=0) {
             if(l[i].get<distance>() < new_item.get<distance>()){
                 l[i+1] = l[i].make_copy();
@@ -338,7 +337,7 @@ int main(int argc, char *argv[])
 
     groupby_and_sort gs(&es);
     cal_distance cd(&gs);
-    max_n mn(&cd, 5);
+    max_n mn(&cd, 2);
 
     hpda::output::internal::memory_output_impl<NTO_distance_entry> checker( &mn );
     
