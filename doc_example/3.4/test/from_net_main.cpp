@@ -1,5 +1,5 @@
-#include"netio.cpp"
-#include"common.h"
+#include "../netio.cpp"
+#include "../common.h"
 
 int main() {
     hpda::engine engine;
