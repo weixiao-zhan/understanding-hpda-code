@@ -4,11 +4,11 @@
 #include "netio.cpp"
 
 // starting with a csv file reader
-class cvs_extractor : public hpda::extractor::internal::raw_data_impl<NTO_data_entry>
+class cvs_extractor : public hpda::internal::processor_with_output<NTO_data_entry>
 {
 public:
     cvs_extractor(const std::string &filename)
-        : hpda::extractor::internal::raw_data_impl<NTO_data_entry>()
+        : hpda::internal::processor_with_output<NTO_data_entry>()
     {
         file.open(filename);
         if (!file.is_open())
@@ -24,10 +24,8 @@ public:
     bool process() override
     {
         std::string line;
-        if (std::getline(file, line))
-        {
+        if (std::getline(file, line)) {
             std::istringstream s(line);
-
             std::vector<std::string> fields;
             std::string field;
             while (getline(s, field, ','))
@@ -39,16 +37,21 @@ public:
             one_loc_info.set<longitude, latitude, timestamp>(
                 std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 
-            NTO_data_entry one_entry;
-            one_entry.set<phone_number>(std::stoll(fields[0]));
-            one_entry.set<loc_info>(one_loc_info);
-            hpda::extractor::internal::raw_data_impl<NTO_data_entry>::add_data(one_entry);
+            theObj.set<phone_number>(std::stoll(fields[0]));
+            theObj.set<loc_info>(one_loc_info);
+            return true;
         }
-        return hpda::extractor::internal::raw_data_impl<NTO_data_entry>::process();
+        return false;
+    }
+
+    NTO_data_entry output_value() override 
+    {
+        return theObj;
     }
 
 private:
     std::ifstream file;
+    NTO_data_entry theObj;
 };
 
 class hash_splitter : public hpda::processor::internal::split_impl<NTO_data_entry>
