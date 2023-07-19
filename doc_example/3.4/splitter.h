@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 #include "hpda/processor/transform/split.h"
-#include "netio.cpp"
 
 // starting with a csv file reader
 class cvs_extractor : public hpda::internal::processor_with_output<NTO_data_entry>

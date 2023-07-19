@@ -3,7 +3,6 @@
 #include <atomic>
 #include <cmath>
 #include <numeric>
-#include "netio.cpp"
 
 class groupby_and_sort
     : public hpda::processor::internal::processor_base<NTO_data_entry, NTO_grouped_data_entry>

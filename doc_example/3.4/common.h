@@ -2,6 +2,7 @@
 #include "hpda/hpda.h"
 #include "ff/util/ntobject.h"
 #include "ff/network.h"
+#include "netio.h"
 
 define_nt(phone_number,long long int);
 define_nt(longitude, float);

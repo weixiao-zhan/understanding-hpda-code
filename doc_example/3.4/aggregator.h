@@ -1,6 +1,5 @@
 #pragma once
 #include "common.h"
-#include "netio.cpp"
 
 class write_to_file : public hpda::internal::processor_with_input<NTO_distance_entry>
 {
