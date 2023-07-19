@@ -1,5 +1,5 @@
-#include "common.h"
-#include "netio.cpp"
+#include "aggregator.h"
+#include "worker.h"
 
 int main(int argc, char *argv[])
 {
@@ -33,17 +33,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    auto* checker = new hpda::output::internal::memory_output_impl<NTO_distance_entry>(concat);
-    checker->set_engine(&engine);
+    max_n mn(concat, 5);
+    mn.set_engine(&engine);
 
-    engine.run();
+    write_to_file wf(&mn, "../doc_example/3.4/data/output.csv");
+    wf.set_engine(&engine);
 
-    std::cout << "size " << checker->values().size() << std::endl;
-    for (auto v : checker->values())
-    {
-        std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<distance>() << std::endl;
-        std::cout << std::endl;
-    }
-    
+    engine.run();    
 }

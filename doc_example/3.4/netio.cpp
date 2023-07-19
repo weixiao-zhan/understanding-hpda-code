@@ -1,10 +1,48 @@
+#pragma once
 #include "hpda/hpda.h"
 #include "ff/network.h"
-#include "SafeQueue.cpp"
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
-typedef ff::net::ntpackage<3> NTP_no_more_data_flag; // using a magic UID
+template<typename T>
+class SafeQueue {
+private:
+    std::queue<T> q;
+    mutable std::mutex mtx;
+    std::condition_variable cond;
+public:
+    SafeQueue() {}
 
-//class to_net:
+    void enqueue(T t) {
+        std::lock_guard<std::mutex> lock(mtx);
+        q.push(t);
+        cond.notify_one();
+    }
+
+    T dequeue() {
+        std::unique_lock<std::mutex> lock(mtx);
+        cond.wait(lock, [this](){ return !q.empty(); });
+        T val = q.front();
+        q.pop();
+        return val;
+    }
+
+    bool empty() const {
+        std::lock_guard<std::mutex> lock(mtx);
+        return q.empty();
+    }
+
+    size_t size() const {
+        std::lock_guard<std::mutex> lock(mtx);
+        return q.size();
+    }
+};
+
+
+typedef ff::net::ntpackage<8568956> NETIO_no_more_data_flag; // using a random-generated magic packageID
+
 template <typename InputObjType>
 class to_net 
     : public hpda::internal::processor_with_input<InputObjType>, 
@@ -23,14 +61,13 @@ public:
 
     ~to_net()
     {
-
         netapp_thrd->join();
         delete app;
     }
 
     virtual void initialize(ff::net::net_mode nm, const std::vector<std::string> &args)
     {
-        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&to_net::on_recv_end_flag, this,
+        pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&to_net::on_recv_end_flag, this,
                                     std::placeholders::_1,
                                     std::placeholders::_2));
         netn = new ff::net::net_nervure(nm);
@@ -94,12 +131,12 @@ private:
     }
 
     void send_end_flag(ff::net::tcp_connection_base* server) {
-        std::shared_ptr<NTP_no_more_data_flag> pkg(new NTP_no_more_data_flag());
+        std::shared_ptr<NETIO_no_more_data_flag> pkg(new NETIO_no_more_data_flag());
         server->send(pkg);
         std::cout<< "sent end flag" << std::endl;
     }
 
-    void on_recv_end_flag(std::shared_ptr<NTP_no_more_data_flag> msg,
+    void on_recv_end_flag(std::shared_ptr<NETIO_no_more_data_flag> msg,
                     ff::net::tcp_connection_base *server)
     {
         std::cout << "got ack end flag" << std::endl;
@@ -160,7 +197,7 @@ public:
         pkghub.tcp_to_recv_pkg<NTP_data>(std::bind(&from_net::on_recv_data, this,
                                                    std::placeholders::_1,
                                                    std::placeholders::_2));
-        pkghub.tcp_to_recv_pkg<NTP_no_more_data_flag>(std::bind(&from_net::on_recv_end_flag, this,
+        pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&from_net::on_recv_end_flag, this,
                                             std::placeholders::_1,
                                             std::placeholders::_2));
 
@@ -234,12 +271,12 @@ protected:
         queue.enqueue(data);
     }
 
-    void on_recv_end_flag(std::shared_ptr<NTP_no_more_data_flag> msg,
+    void on_recv_end_flag(std::shared_ptr<NETIO_no_more_data_flag> msg,
                     ff::net::tcp_connection_base *client)
     {
         std::cout << "got end flag" << std::endl;
         done_transfer.store(true);
-        std::shared_ptr<NTP_no_more_data_flag> pkg(new NTP_no_more_data_flag());
+        std::shared_ptr<NETIO_no_more_data_flag> pkg(new NETIO_no_more_data_flag());
         client->send(pkg);
         std::cout<< "sent ack end flag" << std::endl;
     }
