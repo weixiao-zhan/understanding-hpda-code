@@ -18,7 +18,7 @@ public:
             std::string ip="127.0.0.1", int port = 8000, char* routine_name="to_net") 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
           ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
-          first_process(true), conn_setup(false), done_transfer(false)
+          net_app_started(false), conn_setup(false), done_transfer(false)
     {   }
 
     ~to_net()
@@ -50,9 +50,8 @@ public:
 
     bool process() override 
     {
-        if (first_process) {
+        if (!net_app_started) {
             netapp_thrd = new std::thread(std::bind(&to_net::do_net_app_initialization, this));
-            first_process = false;
         }
         while(!conn_setup.load()){
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -83,6 +82,7 @@ private:
         int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
         app->initialize(my_argc, arguments);
         app->register_routine(this);
+        net_app_started = true;
         app->run();
     }
 
@@ -128,7 +128,7 @@ protected:
     ff::net::tcp_connection_base *server;
     std::thread* netapp_thrd;
 
-    bool first_process = true;
+    bool net_app_started = true;
     std::atomic<bool> conn_setup;
     std::atomic<bool> done_transfer;
 };
@@ -145,7 +145,7 @@ public:
     from_net(std::string ip="127.0.0.1", int port = 8000, char* routine_name="from_net")
     : hpda::internal::processor_with_output<OutputObjType>(),
       ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
-      first_process(true), conn_setup(false), done_transfer(false)
+      net_app_started(false), conn_setup(false), done_transfer(false)
     {    }
 
     ~from_net()
@@ -181,9 +181,8 @@ public:
     }
 
     bool process() override {
-        if(first_process){
-            netapp_thrd = new std::thread(std::bind(&from_net::do_net_app_initialization, this));
-            first_process = false;
+        if(!net_app_started){
+            start_net_app();
         }
         while (conn_setup.load()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -203,6 +202,14 @@ public:
         return theObj;
     }
 
+    void start_net_app() {
+        if(!net_app_started){
+           netapp_thrd = new std::thread(std::bind(&from_net::do_net_app_initialization, this));
+        } else {
+            std::cerr << "net_app already started" << std::endl;
+        }
+    }
+
 protected:
     void do_net_app_initialization() {
         app = new ff::net::application("from_net");
@@ -215,6 +222,7 @@ protected:
         int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
         app->initialize(my_argc, arguments);
         app->register_routine(this);
+        net_app_started = true;
         app->run();
     }
 
@@ -266,7 +274,7 @@ protected:
     ff::net::net_nervure *netn;
     std::thread* netapp_thrd;
 
-    bool first_process = true;
+    bool net_app_started = true;
     std::atomic<bool> conn_setup;
     std::atomic<bool> done_transfer;
 
