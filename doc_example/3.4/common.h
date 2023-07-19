@@ -21,10 +21,8 @@ define_nt(loc_history, std::vector<NTO_loc_info>); // should I use define_NT fie
 typedef ff::util::ntobject<phone_number, loc_history> NTO_grouped_data_entry;
 typedef ff::util::ntobject<phone_number, distance> NTO_distance_entry;
 
-define_nt(idx, long long int);
-define_nt(data_entry, NTO_data_entry);
-typedef ff::net::ntpackage<2, idx, data_entry> NTP_data_entry;
-typedef ff::net::ntpackage<3> NTP_no_more_data_flag;
+static const uint splitter_worker_port_base = 8000;
+static const uint worker_aggregator_port_base = 9000;
 
 namespace ff { namespace net
 {

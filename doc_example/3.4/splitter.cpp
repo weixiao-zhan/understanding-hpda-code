@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     uint worker_num = std::stoi(argv[1]);
     std::vector<to_net<NTO_data_entry>*> output_list;
     for(int i = 0; i < worker_num; i++) {
-        to_net<NTO_data_entry>* tmp = new to_net<NTO_data_entry>(hs.new_split_stream(), "127.0.0.1", 8000+i);
+        to_net<NTO_data_entry>* tmp = new to_net<NTO_data_entry>(hs.new_split_stream(), "127.0.0.1", splitter_worker_port_base+i);
         tmp->set_engine(&engine);
         output_list.push_back(tmp);
     }

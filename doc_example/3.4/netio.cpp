@@ -44,6 +44,7 @@ public:
 
     virtual void run()
     {
+        std::cout << "to_net.client: starting" << std::endl;
         netn->run();
     }
 
@@ -174,6 +175,7 @@ public:
 
     virtual void run() { 
         std::thread monitor_thrd(std::bind(&from_net::done_transfer_and_close_conn, this));
+        std::cout << "from_net.server: starting" << std::endl;
         netn->run();
         monitor_thrd.join();
     }

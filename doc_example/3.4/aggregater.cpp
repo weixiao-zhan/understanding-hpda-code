@@ -1,7 +1,6 @@
 #include "common.h"
 #include "netio.cpp"
 
-
 int main(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -17,27 +16,33 @@ int main(int argc, char *argv[])
     }
 
     std::vector<from_net<NTO_distance_entry>*> input_list;
-    std::vector<hpda::output::internal::memory_output_impl<NTO_distance_entry>*> checker_list;
+    hpda::processor::internal::concat_impl<NTO_distance_entry>* concat;
 
+    std::vector<hpda::output::internal::memory_output_impl<NTO_distance_entry>*> checker_list;
     for(uint i = 0; i < worker_num; i++) {
-        from_net<NTO_distance_entry>* tmp = new from_net<NTO_distance_entry>("127.0.0.1", 9000+i);
+        from_net<NTO_distance_entry>* tmp = new from_net<NTO_distance_entry>("127.0.0.1", worker_aggregator_port_base+i);
         tmp->set_engine(&engine);
         input_list.push_back(tmp);
 
-        auto* checker = new hpda::output::internal::memory_output_impl<NTO_distance_entry>(tmp);
-        checker->set_engine(&engine);
-        checker_list.push_back(checker);
+        if (i == 0) {
+            concat = new hpda::processor::internal::concat_impl<NTO_distance_entry>(tmp);
+            concat->set_engine(&engine);
+        } else {
+            concat->add_upper_stream(tmp);
+        }
     }
+
+    auto* checker = new hpda::output::internal::memory_output_impl<NTO_distance_entry>(concat);
+    checker->set_engine(&engine);
 
     engine.run();
 
-    for (auto checker : checker_list) {
-        std::cout << "size " << checker->values().size() << std::endl;
-        for (auto v : checker->values())
-        {
-            std::cout << v.get<phone_number>() << "|";
-            std::cout << v.get<distance>() << std::endl;
-            std::cout << std::endl;
-        }
+    std::cout << "size " << checker->values().size() << std::endl;
+    for (auto v : checker->values())
+    {
+        std::cout << v.get<phone_number>() << "|";
+        std::cout << v.get<distance>() << std::endl;
+        std::cout << std::endl;
     }
+    
 }

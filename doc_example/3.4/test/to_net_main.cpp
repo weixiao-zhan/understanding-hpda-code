@@ -1,7 +1,7 @@
 #include "../netio.cpp"
 #include "../common.h"
 
-int main() {
+int main(int argc, char* argv[]) {
     hpda::engine engine;
 
     hpda::extractor::internal::raw_data_impl<NTO_data_entry> rd;
@@ -13,7 +13,7 @@ int main() {
         rd.add_data(d);
     }
 
-    to_net<NTO_data_entry> no(&rd);
+    to_net<NTO_data_entry> no(&rd, "127.0.0.1", std::stoi(argv[1]));
     no.set_engine(&engine);
 
     engine.run();

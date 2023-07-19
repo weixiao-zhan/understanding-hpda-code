@@ -1,12 +1,12 @@
 #include "../netio.cpp"
 #include "../common.h"
 
-int main() {
+int main(int argc, char* argv[]) {
     hpda::engine engine;
-    from_net<NTO_data_entry> ni;
+    from_net<NTO_distance_entry> ni("127.0.0.1", std::stoi(argv[1]));
     ni.set_engine(&engine);
 
-    hpda::output::internal::memory_output_impl<NTO_data_entry> mo(&ni);
+    hpda::output::internal::memory_output_impl<NTO_distance_entry> mo(&ni);
     ni.set_engine(&engine);
 
     engine.run();
