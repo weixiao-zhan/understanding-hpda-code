@@ -8,18 +8,13 @@ define_nt(phone_number,long long int);
 define_nt(longitude, float);
 define_nt(latitude, float);
 define_nt(timestamp, long long int);
-define_nt(distance, float);
 typedef ff::util::ntobject<longitude, latitude, timestamp> NTO_loc_info;
 define_nt(loc_info, NTO_loc_info);
-
-/*
-typedef ff::util::ntobject<phone_number, NTO_loc_info> NTO_data_entry; // comile error on init
-define_nt(nto_loc_info, ff::util::ntobject<longitude, latitude, timestamp> NTO_loc_info); // compile error on type check
-*/
-
 typedef ff::util::ntobject<phone_number, loc_info> NTO_data_entry;
-define_nt(loc_history, std::vector<NTO_loc_info>); // should I use define_NT field, or NTobject
+
+define_nt(loc_history, std::vector<NTO_loc_info>);
 typedef ff::util::ntobject<phone_number, loc_history> NTO_grouped_data_entry;
+define_nt(distance, float);
 typedef ff::util::ntobject<phone_number, distance> NTO_distance_entry;
 
 static const uint splitter_worker_port_base = 8000;
