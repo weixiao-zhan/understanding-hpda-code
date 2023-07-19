@@ -50,10 +50,10 @@ private:
     std::ifstream file;
 };
 
-class hash_spliter : public hpda::processor::internal::split_impl<NTO_data_entry>
+class hash_splitter : public hpda::processor::internal::split_impl<NTO_data_entry>
 {
 public:
-    hash_spliter(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream)
+    hash_splitter(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream)
         : hpda::processor::internal::split_impl<NTO_data_entry>(upper_stream)
     {
     }
@@ -77,46 +77,30 @@ protected:
 
 int main(int argc, char *argv[])
 {
+    if (argc != 2) {
+        std::cout << "usage: <binary> <num_worker>";
+        exit(0);
+    }
     hpda::engine engine;
 
     cvs_extractor ce("../doc_example/3.4/data/phone_geo_time.csv");
     ce.set_engine(&engine);
-    /*
-    hpda::output::internal::memory_output_impl<NTO_data_entry> checker( &ce );
-    engine.run();
-    std::cout << checker.values().size() << std::endl;
-    for (auto v : checker.values()) {
-        std::cout << v.get<phone_number>() << std::endl;
-    }
-    */
 
-    hash_spliter hs(&ce);
+    hash_splitter hs(&ce);
     hs.set_engine(&engine);
 
-    /*
-    hpda::output::internal::memory_output_impl<NTO_data_entry> checker1( hs.new_split_stream() );
-    hpda::output::internal::memory_output_impl<NTO_data_entry> checker2( hs.new_split_stream() );
-    engine.run();
-    std::cout << "size" << checker1.values().size() << std::endl;
-    for (auto v : checker1.values()) {
-        std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<loc_info>().get<timestamp>()  << std::endl;
+    uint worker_num = std::stoi(argv[1]);
+    std::vector<to_net<NTO_data_entry>*> output_list;
+    for(int i = 0; i < worker_num; i++) {
+        to_net<NTO_data_entry>* tmp = new to_net<NTO_data_entry>(hs.new_split_stream(), "127.0.0.1", 8000+i);
+        tmp->set_engine(&engine);
+        output_list.push_back(tmp);
     }
-    std::cout << "size" << checker2.values().size() << std::endl;
-    for (auto v : checker2.values()) {
-        std::cout << v.get<phone_number>() << "|";
-        std::cout << v.get<loc_info>().get<timestamp>()  << std::endl ;
-    }
-    */
-
-    to_net<NTO_data_entry> tn0(hs.new_split_stream(), "127.0.0.1", 8000);
-    to_net<NTO_data_entry> tn1(hs.new_split_stream(), "127.0.0.1", 8001);
-    
-    tn0.set_engine(&engine);
-    tn1.set_engine(&engine);
 
     engine.run();
-    tn0.hpda_engine_complete();
-    tn1.hpda_engine_complete();
+
+    for(int i = 0; i < worker_num; i++) {
+        output_list[i]->hpda_engine_complete();        
+    }
     return 0;
 }
