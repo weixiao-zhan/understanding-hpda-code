@@ -119,7 +119,7 @@ private:
     std::vector<NTO_data_entry> input_data;
     std::vector<NTO_grouped_data_entry> output_data;
     bool grouped_and_sorted = false;
-    uint output_idx = 0;
+    uint output_idx = -1;
 };
 
 class cal_distance

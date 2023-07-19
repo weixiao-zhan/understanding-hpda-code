@@ -11,9 +11,6 @@ int main(int argc, char *argv[])
     cvs_extractor ce("../doc_example/3.4/data/phone_geo_time.csv");
     ce.set_engine(&engine);
 
-    hpda::output::internal::memory_output_impl<NTO_data_entry> checker (&ce);
-    checker.set_engine(&engine);
-
     hash_splitter hs(&ce);
     hs.set_engine(&engine);
 
@@ -29,11 +26,6 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < worker_num; i++) {
         output_list[i]->hpda_engine_complete();        
-    }
-
-
-    for (auto e : checker.values()) {
-        std::cout << e.get<phone_number>() << std::endl;
     }
 
     return 0;

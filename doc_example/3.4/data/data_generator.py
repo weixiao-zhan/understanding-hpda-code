@@ -2,8 +2,8 @@ import csv
 import random
 from faker import Faker
 
-PHONE_NUM = 5
-ENTRY_NUM = 20
+PHONE_NUM = 10
+ENTRY_NUM = 50
 
 def generate_to_csv(filename):
     with open(filename, mode='w', newline='') as file:
@@ -11,7 +11,7 @@ def generate_to_csv(filename):
         phone_numbers = [fake.phone_number() for _ in range(PHONE_NUM)]
         for _ in range(ENTRY_NUM):
             phone_number = random.choice(phone_numbers)
-            writer.writerow([phone_number, fake.latitude(), fake.longitude(), int(fake.date_time_this_year().timestamp())])
+            writer.writerow([phone_number, fake.longitude(), fake.latitude(), int(fake.date_time_this_year().timestamp())])
 
 if __name__ == "__main__":
     fake = Faker("zh_CN")

@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
     }
 
     uint id = std::stoi(argv[1]);
-    std::cout << splitter_worker_port_base+id << " ->" << worker_aggregator_port_base+id << std::endl;
+    std::cout << splitter_worker_port_base+id << " -> " << worker_aggregator_port_base+id << std::endl;
     hpda::engine engine;
 
     from_net<NTO_data_entry> fn("127.0.0.1", splitter_worker_port_base+id);
@@ -27,5 +27,6 @@ int main(int argc, char *argv[])
     tn.set_engine(&engine);
 
     engine.run();
+
     tn.hpda_engine_complete();
 }

@@ -25,18 +25,20 @@ public:
         std::string line;
         if (std::getline(file, line)) {
             std::istringstream s(line);
-            std::vector<std::string> fields;
             std::string field;
-            while (getline(s, field, ','))
-            {
-                fields.push_back(field);
-            }
+
+            std::getline(s, field, ',');
+            theObj.set<phone_number>(std::stoll(field));
+
 
             NTO_loc_info one_loc_info;
-            one_loc_info.set<longitude, latitude, timestamp>(
-                std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
-
-            theObj.set<phone_number>(std::stoll(fields[0]));
+            std::getline(s, field, ',');
+            one_loc_info.set<longitude>(std::stof(field));
+            std::getline(s, field, ',');
+            one_loc_info.set<latitude>(std::stof(field));
+            std::getline(s, field, ',');
+            one_loc_info.set<timestamp>(std::stoll(field));
+            
             theObj.set<loc_info>(one_loc_info);
             return true;
         }
