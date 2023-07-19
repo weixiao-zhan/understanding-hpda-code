@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     from_net<NTO_data_entry> fn("127.0.0.1", splitter_worker_port_base+id);
     fn.set_engine(&engine);
 
-    groupby_and_sort gs(&fn);
+    group_and_sort gs(&fn);
     gs.set_engine(&engine);
 
     cal_distance cd(&gs);

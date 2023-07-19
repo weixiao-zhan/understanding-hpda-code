@@ -4,11 +4,11 @@
 #include <cmath>
 #include <numeric>
 
-class groupby_and_sort
+class group_and_sort
     : public hpda::processor::internal::processor_base<NTO_data_entry, NTO_grouped_data_entry>
 {
 public:
-    groupby_and_sort(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream)
+    group_and_sort(hpda::internal::processor_with_output<NTO_data_entry> *upper_stream)
         : hpda::processor::internal::processor_base<NTO_data_entry, NTO_grouped_data_entry>(upper_stream)
     {
     }
