@@ -55,7 +55,7 @@ public:
             std::string ip="127.0.0.1", int port = 8000) 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
           ip(ip), port(port),
-          net_module_started(false), conn_setup(false), done_transfer(false)
+          net_module_started(false), conn_setup(false)
     {   
         init_net_module();
     }
@@ -99,9 +99,6 @@ public:
 private:
     virtual void init_net_module()
     {
-        pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&to_net::on_recv_end_flag, this,
-                                    std::placeholders::_1,
-                                    std::placeholders::_2));
         netn = new ff::net::net_nervure(ff::net::net_mode::real_net);
         netn->add_pkg_hub(pkghub);
         netn->add_tcp_client(ip, port);
@@ -129,13 +126,6 @@ private:
         std::cout<< "sent end flag" << std::endl;
     }
 
-    void on_recv_end_flag(std::shared_ptr<NETIO_no_more_data_flag> msg,
-                    ff::net::tcp_connection_base *server)
-    {
-        std::cout << "got ack end flag" << std::endl;
-        done_transfer.store(true);
-    }
-
     void on_conn_succ(ff::net::tcp_connection_base *server)
     {
         ff::net::mout << "connect success" << std::endl;
@@ -158,7 +148,6 @@ protected:
 
     bool net_module_started = true;
     std::atomic<bool> conn_setup;
-    std::atomic<bool> done_transfer;
 };
 
 template <typename OutputObjType>
@@ -251,9 +240,6 @@ protected:
     {
         std::cout << "got end flag" << std::endl;
         done_transfer.store(true);
-        std::shared_ptr<NETIO_no_more_data_flag> pkg(new NETIO_no_more_data_flag());
-        client->send(pkg);
-        std::cout<< "sent ack end flag" << std::endl;
     }
 
     void on_conn_succ(ff::net::tcp_connection_base *server)
