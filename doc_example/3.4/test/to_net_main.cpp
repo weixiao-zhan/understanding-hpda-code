@@ -16,5 +16,5 @@ int main(int argc, char* argv[]) {
     no.set_engine(&engine);
 
     engine.run();
-    no.hpda_engine_complete();
+    no.end_net_module();
 }

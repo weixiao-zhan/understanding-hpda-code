@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     engine.run();
 
     for(int i = 0; i < worker_num; i++) {
-        output_list[i]->hpda_engine_complete();        
+        output_list[i]->end_net_module();        
     }
 
     return 0;

@@ -28,5 +28,5 @@ int main(int argc, char *argv[])
 
     engine.run();
 
-    tn.hpda_engine_complete();
+    tn.end_net_module();
 }

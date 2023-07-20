@@ -45,32 +45,63 @@ typedef ff::net::ntpackage<8568956> NETIO_no_more_data_flag; // using a random-g
 
 template <typename InputObjType>
 class to_net 
-    : public hpda::internal::processor_with_input<InputObjType>, 
-      public ff::net::routine
+    : public hpda::internal::processor_with_input<InputObjType>
 {
 define_nt(payload, InputObjType);
 typedef ff::net::ntpackage<0, payload> NTP_data;
 
 public:
     to_net(hpda::internal::processor_with_output<InputObjType> *upper_stream, 
-            std::string ip="127.0.0.1", int port = 8000, char* routine_name="to_net") 
+            std::string ip="127.0.0.1", int port = 8000) 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
-          ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
-          net_app_started(false), conn_setup(false), done_transfer(false)
-    {   }
-
-    ~to_net()
-    {
-        netapp_thrd->join();
-        delete app;
+          ip(ip), port(port),
+          net_module_started(false), conn_setup(false), done_transfer(false)
+    {   
+        init_net_module();
     }
 
-    virtual void initialize(ff::net::net_mode nm, const std::vector<std::string> &args)
+    ~to_net() {
+        net_module_thrd->join();
+    }
+
+    void start_net_module() {
+        if(!net_module_started){
+           net_module_thrd = new std::thread(std::bind(&to_net::run_net_module, this));
+           net_module_started = true;
+        } else {
+            std::cerr << "net_module already started" << std::endl;
+        }
+    }
+
+    void end_net_module() { // to be manually called after engine.run complete.
+        send_end_flag(server);
+    }
+
+    bool process() override 
+    {
+        if (!net_module_started) {
+            start_net_module();
+        }
+        while(!conn_setup.load()){
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        // @here conn is setup
+        if (!hpda::internal::processor_with_input<InputObjType>::has_input_value()){
+            return false;
+        }
+        std::cout << "sending data" << std::endl;
+        send_data(server, hpda::internal::processor_with_input<InputObjType>::input_value());
+        hpda::internal::processor_with_input<InputObjType>::consume_input_value();
+        return true;
+    }
+
+private:
+    virtual void init_net_module()
     {
         pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&to_net::on_recv_end_flag, this,
                                     std::placeholders::_1,
                                     std::placeholders::_2));
-        netn = new ff::net::net_nervure(nm);
+        netn = new ff::net::net_nervure(ff::net::net_mode::real_net);
         netn->add_pkg_hub(pkghub);
         netn->add_tcp_client(ip, port);
         netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
@@ -78,49 +109,10 @@ public:
         netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
             std::bind(&to_net::on_conn_lost, this, std::placeholders::_1));
     }
-
-    virtual void run()
-    {
+    
+    void run_net_module() { 
         std::cout << "to_net.client: starting" << std::endl;
         netn->run();
-    }
-
-    bool process() override 
-    {
-        if (!net_app_started) {
-            netapp_thrd = new std::thread(std::bind(&to_net::do_net_app_initialization, this));
-        }
-        while(!conn_setup.load()){
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-        if (!hpda::internal::processor_with_input<InputObjType>::has_input_value()){
-            return false;
-        }
-        std::cout << "sending data" << std::endl;
-        // @here conn is setup
-        send_data(server, hpda::internal::processor_with_input<InputObjType>::input_value());
-        hpda::internal::processor_with_input<InputObjType>::consume_input_value();
-        return true;
-    }
-
-    void hpda_engine_complete() { // to be manually called after engine.run complete.
-        send_end_flag(server);
-    }
-
-private:
-    void do_net_app_initialization() {
-        app = new ff::net::application("to_net");
-        char *arguments[] = {
-            "binary place holder",
-            "--routine",
-            routine_name,
-            nullptr
-        };
-        int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
-        app->initialize(my_argc, arguments);
-        app->register_routine(this);
-        net_app_started = true;
-        app->run();
     }
 
     void send_data(ff::net::tcp_connection_base *server, InputObjType data) {
@@ -158,68 +150,48 @@ private:
 protected:
     std::string ip;
     int port;
-    char* routine_name;
-    ff::net::application* app;
     ff::net::typed_pkg_hub pkghub;
     ff::net::net_nervure *netn;
     ff::net::tcp_connection_base *server;
-    std::thread* netapp_thrd;
+    std::thread* net_module_thrd;
 
-    bool net_app_started = true;
+    bool net_module_started = true;
     std::atomic<bool> conn_setup;
     std::atomic<bool> done_transfer;
 };
 
 template <typename OutputObjType>
 class from_net 
-    : public hpda::internal::processor_with_output<OutputObjType>,
-      public ff::net::routine 
+    : public hpda::internal::processor_with_output<OutputObjType>
 {
 define_nt(payload, OutputObjType);
 typedef ff::net::ntpackage<0, payload> NTP_data;
 
 public:
-    from_net(std::string ip="127.0.0.1", int port = 8000, char* routine_name="from_net")
+    from_net(std::string ip="127.0.0.1", int port = 8000)
     : hpda::internal::processor_with_output<OutputObjType>(),
-      ff::net::routine(routine_name), ip(ip), port(port), routine_name(routine_name),
-      net_app_started(false), conn_setup(false), done_transfer(false)
-    {    }
-
-    ~from_net()
+      ip(ip), port(port),
+      net_module_started(false), conn_setup(false), done_transfer(false)
     {
-        netapp_thrd->join();
-        delete app;
+        init_net_module();
     }
 
-    virtual void initialize(ff::net::net_mode nm,
-                            const std::vector<std::string> &args)
-    {
-        pkghub.tcp_to_recv_pkg<NTP_data>(std::bind(&from_net::on_recv_data, this,
-                                                   std::placeholders::_1,
-                                                   std::placeholders::_2));
-        pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&from_net::on_recv_end_flag, this,
-                                            std::placeholders::_1,
-                                            std::placeholders::_2));
-
-        netn = new ff::net::net_nervure(nm);
-        netn->add_pkg_hub(pkghub);
-        netn->add_tcp_server(ip, port);
-        netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
-            std::bind(&from_net::on_conn_succ, this, std::placeholders::_1));
-        netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
-            std::bind(&from_net::on_conn_lost, this, std::placeholders::_1, netn));
+    ~from_net() {
+        net_module_thrd->join();
     }
 
-    virtual void run() { 
-        std::thread monitor_thrd(std::bind(&from_net::done_transfer_and_close_conn, this));
-        std::cout << "from_net.server: starting" << std::endl;
-        netn->run();
-        monitor_thrd.join();
+    void start_net_module() {
+        if(!net_module_started){
+           net_module_thrd = new std::thread(std::bind(&from_net::run_net_module, this));
+           net_module_started = true;
+        } else {
+            std::cerr << "net_module already started" << std::endl;
+        }
     }
 
     bool process() override {
-        if(!net_app_started){
-            start_net_app();
+        if(!net_module_started){
+            start_net_module();
         }
         while (conn_setup.load()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -238,29 +210,30 @@ public:
     {
         return theObj;
     }
+protected:
+    virtual void init_net_module()
+    {
+        pkghub.tcp_to_recv_pkg<NTP_data>(std::bind(&from_net::on_recv_data, this,
+                                                   std::placeholders::_1,
+                                                   std::placeholders::_2));
+        pkghub.tcp_to_recv_pkg<NETIO_no_more_data_flag>(std::bind(&from_net::on_recv_end_flag, this,
+                                            std::placeholders::_1,
+                                            std::placeholders::_2));
 
-    void start_net_app() {
-        if(!net_app_started){
-           netapp_thrd = new std::thread(std::bind(&from_net::do_net_app_initialization, this));
-        } else {
-            std::cerr << "net_app already started" << std::endl;
-        }
+        netn = new ff::net::net_nervure(ff::net::net_mode::real_net);
+        netn->add_pkg_hub(pkghub);
+        netn->add_tcp_server(ip, port);
+        netn->get_event_handler()->listen<ff::net::event::tcp_get_connection>(
+            std::bind(&from_net::on_conn_succ, this, std::placeholders::_1));
+        netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
+            std::bind(&from_net::on_conn_lost, this, std::placeholders::_1, netn));
     }
 
-protected:
-    void do_net_app_initialization() {
-        app = new ff::net::application("from_net");
-        char *arguments[] = {
-            "binary place holder",
-            "--routine",
-            routine_name,
-            nullptr
-        };
-        int my_argc = sizeof(arguments) / sizeof(arguments[0]) - 1;
-        app->initialize(my_argc, arguments);
-        app->register_routine(this);
-        net_app_started = true;
-        app->run();
+    void run_net_module() { 
+        std::thread monitor_thrd(std::bind(&from_net::done_transfer_and_close_conn, this));
+        std::cout << "from_net.server: starting" << std::endl;
+        netn->run();
+        monitor_thrd.join();
     }
 
     void on_recv_data(std::shared_ptr<NTP_data> nt_data,
@@ -299,19 +272,17 @@ protected:
         }
         // done transfer;
         netn->stop();
-        std::cout << "monitor_thrd: on transfer done, stopped net_app" << std::endl;
-    } 
+        std::cout << "monitor_thrd: on transfer done, stopped net_module" << std::endl;
+    }
 
 protected:
     std::string ip;
     int port;
-    char* routine_name;
-    ff::net::application* app;
     ff::net::typed_pkg_hub pkghub;
     ff::net::net_nervure *netn;
-    std::thread* netapp_thrd;
+    std::thread* net_module_thrd;
 
-    bool net_app_started = true;
+    bool net_module_started = false;
     std::atomic<bool> conn_setup;
     std::atomic<bool> done_transfer;
 
