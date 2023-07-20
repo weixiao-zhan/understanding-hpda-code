@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
     engine.run();
 
     for(int i = 0; i < worker_num; i++) {
-        output_list[i]->end_net_module();        
+        delete output_list[i];        // make sure the destruction is properly called.
     }
-
+    
     return 0;
 }

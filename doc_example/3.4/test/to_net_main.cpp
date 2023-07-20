@@ -16,5 +16,4 @@ int main(int argc, char* argv[]) {
     no.set_engine(&engine);
 
     engine.run();
-    no.end_net_module();
 }

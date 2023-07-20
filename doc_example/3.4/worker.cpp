@@ -27,6 +27,4 @@ int main(int argc, char *argv[])
     tn.set_engine(&engine);
 
     engine.run();
-
-    tn.end_net_module();
 }

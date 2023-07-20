@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
     for(uint i = 0; i < worker_num; i++) {
         from_net<NTO_distance_entry>* tmp = new from_net<NTO_distance_entry>("127.0.0.1", worker_aggregator_port_base+i);
         tmp->set_engine(&engine);
-        tmp->start_net_module();
         input_list.push_back(tmp);
 
         if (i == 0) {

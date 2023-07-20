@@ -61,6 +61,7 @@ public:
     }
 
     ~to_net() {
+        end_net_module();
         net_module_thrd->join();
     }
 
@@ -174,6 +175,7 @@ public:
       net_module_started(false), conn_setup(false), done_transfer(false)
     {
         init_net_module();
+        start_net_module();
     }
 
     ~from_net() {
@@ -257,6 +259,7 @@ protected:
     void on_conn_succ(ff::net::tcp_connection_base *server)
     {
         ff::net::mout << "connect success, waiting for data ..." << std::endl;
+        
     }
 
     void on_conn_lost(ff::net::tcp_connection_base *pConn,
