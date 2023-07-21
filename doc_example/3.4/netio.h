@@ -11,19 +11,21 @@ class SafeQueue {
 private:
     std::queue<T> q;
     mutable std::mutex mtx;
-    std::condition_variable cond;
+    std::condition_variable cv;
 public:
     SafeQueue() {}
 
     void enqueue(T t) {
         std::lock_guard<std::mutex> lock(mtx);
         q.push(t);
-        cond.notify_one();
+        if(q.size() == 1){
+            cv.notify_one();
+        }
     }
 
     T dequeue() {
         std::unique_lock<std::mutex> lock(mtx);
-        cond.wait(lock, [this](){ return !q.empty(); });
+        cv.wait(lock, [this](){ return !q.empty(); });
         T val = q.front();
         q.pop();
         return val;
@@ -55,7 +57,7 @@ public:
             std::string ip="127.0.0.1", int port = 8000) 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
           ip(ip), port(port),
-          net_module_running(false), conn_setup(false)
+          net_module_running(false), connected(false)
     {   
         init_net_module();
         start_net_module();
@@ -67,14 +69,15 @@ public:
 
     bool process() override 
     {
-        while(!conn_setup.load()){
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+        std::unique_lock<std::mutex> lock(connected_mtx);
+        connected_cv.wait(lock, [this]() { return connected == true; });
         // @here conn is setup
         if (!hpda::internal::processor_with_input<InputObjType>::has_input_value()){
             return false;
         }
+        #ifdef VERBOSE_OUTPUT
         std::cout << "sending data" << std::endl;
+        #endif
         send_data(server, hpda::internal::processor_with_input<InputObjType>::input_value());
         hpda::internal::processor_with_input<InputObjType>::consume_input_value();
         return true;
@@ -99,24 +102,26 @@ private:
                 netn->run();
             });
            net_module_running = true;
-        } else {
-            std::cerr << "to_net.net_module: client already started" << std::endl;
         }
     }
 
     void stop_net_module() {
-        send_end_flag(server);
-        net_module_thrd->join(); // wait for server close connection after receiving the end flag
-        delete net_module_thrd;
-        delete netn;
-        std::cout << "to_net.net_module: client stopping" << std::endl;
+        if (net_module_running){
+            send_end_flag(server);
+            net_module_thrd->join(); // wait for server close connection after receiving the end flag
+            delete net_module_thrd;
+            delete netn;
+            std::cout << "to_net.net_module: client stopping" << std::endl;
+        }
     }
 
     void send_data(ff::net::tcp_connection_base *server, InputObjType data) {
         std::shared_ptr<NTP_data> pkg = std::make_shared<NTP_data>();
         pkg->template set<payload>(data);
         server->send(pkg);
+        #ifdef VERBOSE_OUTPUT
         std::cout << "sent one" << std::endl;
+        #endif
     }
 
     void send_end_flag(ff::net::tcp_connection_base* server) {
@@ -129,7 +134,10 @@ private:
     {
         ff::net::mout << "to_net.net_module: connect success" << std::endl;
         this->server = server;
-        conn_setup.store(true);
+        
+        std::lock_guard<std::mutex> lock(connected_mtx);
+        connected = true;
+        connected_cv.notify_one();
     }
 
     void on_conn_lost(ff::net::tcp_connection_base *server)
@@ -145,8 +153,10 @@ protected:
     ff::net::tcp_connection_base *server;
     std::thread* net_module_thrd;
 
-    bool net_module_running = true;
-    std::atomic<bool> conn_setup;
+    bool net_module_running;
+    bool connected;
+    std::mutex connected_mtx;
+    std::condition_variable connected_cv;
 };
 
 template <typename OutputObjType>
@@ -160,7 +170,7 @@ public:
     from_net(std::string ip="127.0.0.1", int port = 8000)
     : hpda::internal::processor_with_output<OutputObjType>(),
       ip(ip), port(port),
-      net_module_running(false), conn_setup(false), got_end_flag(false)
+      net_module_running(false), connected(false), got_end_flag(false)
     {
         init_net_module();
         start_net_module();
@@ -171,13 +181,15 @@ public:
     }
 
     bool process() override {
-        while (conn_setup.load()) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        {// wait for connection set up
+            std::unique_lock<std::mutex> lock(connected_mtx);
+            connected_cv.wait(lock, [this]() { return connected == true; });
         }
-        while(!got_end_flag.load() && queue.empty()){
-            ;
-        }
-        if(got_end_flag.load() && net_module_running){
+
+        std::unique_lock<std::mutex> lock(got_end_flag_mtx); // issue
+        got_end_flag_cv.wait(lock, [this]() { return !queue.empty() || got_end_flag; }); // issue
+
+        if(got_end_flag && net_module_running){
             stop_net_module();
         }
         if (queue.empty()) {
@@ -235,22 +247,31 @@ protected:
     void on_recv_data(std::shared_ptr<NTP_data> nt_data,
                     ff::net::tcp_connection_base *client)
     {
+        #ifdef VERBOSE_OUTPUT
         std::cout << "received one" << std::endl;
+        #endif
         OutputObjType data = nt_data-> template get<payload>();
         queue.enqueue(data);
+        got_end_flag_cv.notify_one();
     }
 
     void on_recv_end_flag(std::shared_ptr<NETIO_no_more_data_flag> msg,
                     ff::net::tcp_connection_base *client)
     {
         std::cout << "got end flag" << std::endl;
-        got_end_flag.store(true);
+        std::lock_guard<std::mutex> lock(got_end_flag_mtx);
+        got_end_flag = true;
+        got_end_flag_cv.notify_one();
     }
 
     void on_conn_succ(ff::net::tcp_connection_base *client)
     {
         ff::net::mout << "from_net.net_module: connect success, waiting for data ..." << std::endl;
         this->client = client;
+
+        std::lock_guard<std::mutex> lock(connected_mtx);
+        connected = true;
+        connected_cv.notify_one();
     }
 
     void on_conn_lost(ff::net::tcp_connection_base *pConn,
@@ -268,8 +289,12 @@ protected:
     std::thread* net_module_thrd;
 
     bool net_module_running = false;
-    std::atomic<bool> conn_setup;
-    std::atomic<bool> got_end_flag;
+    bool connected;
+    std::mutex connected_mtx;
+    std::condition_variable connected_cv;
+    bool got_end_flag;
+    std::mutex got_end_flag_mtx;
+    std::condition_variable got_end_flag_cv;
 
     SafeQueue<OutputObjType> queue;
     OutputObjType theObj;
