@@ -55,34 +55,18 @@ public:
             std::string ip="127.0.0.1", int port = 8000) 
         : hpda::internal::processor_with_input<InputObjType>(upper_stream),
           ip(ip), port(port),
-          net_module_started(false), conn_setup(false)
+          net_module_running(false), conn_setup(false)
     {   
         init_net_module();
+        start_net_module();
     }
 
     ~to_net() {
-        end_net_module();
-        net_module_thrd->join();
-    }
-
-    void start_net_module() {
-        if(!net_module_started){
-           net_module_thrd = new std::thread(std::bind(&to_net::run_net_module, this));
-           net_module_started = true;
-        } else {
-            std::cerr << "net_module already started" << std::endl;
-        }
-    }
-
-    void end_net_module() { // to be manually called after engine.run complete.
-        send_end_flag(server);
+        stop_net_module();
     }
 
     bool process() override 
     {
-        if (!net_module_started) {
-            start_net_module();
-        }
         while(!conn_setup.load()){
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
@@ -107,10 +91,25 @@ private:
         netn->get_event_handler()->listen<ff::net::event::tcp_lost_connection>(
             std::bind(&to_net::on_conn_lost, this, std::placeholders::_1));
     }
-    
-    void run_net_module() { 
-        std::cout << "to_net.client: starting" << std::endl;
-        netn->run();
+
+    void start_net_module() {
+        if(!net_module_running){
+            net_module_thrd = new std::thread([&](){
+                std::cout << "to_net.net_module: client starting" << std::endl;
+                netn->run();
+            });
+           net_module_running = true;
+        } else {
+            std::cerr << "to_net.net_module: client already started" << std::endl;
+        }
+    }
+
+    void stop_net_module() {
+        send_end_flag(server);
+        net_module_thrd->join(); // wait for server close connection after receiving the end flag
+        delete net_module_thrd;
+        delete netn;
+        std::cout << "to_net.net_module: client stopping" << std::endl;
     }
 
     void send_data(ff::net::tcp_connection_base *server, InputObjType data) {
@@ -128,14 +127,14 @@ private:
 
     void on_conn_succ(ff::net::tcp_connection_base *server)
     {
-        ff::net::mout << "connect success" << std::endl;
+        ff::net::mout << "to_net.net_module: connect success" << std::endl;
         this->server = server;
         conn_setup.store(true);
     }
 
     void on_conn_lost(ff::net::tcp_connection_base *server)
     {
-        ff::net::mout << "connection closed!" << std::endl;
+        ff::net::mout << "to_net.net_module: connection closed" << std::endl;
     }
 
 protected:
@@ -146,7 +145,7 @@ protected:
     ff::net::tcp_connection_base *server;
     std::thread* net_module_thrd;
 
-    bool net_module_started = true;
+    bool net_module_running = true;
     std::atomic<bool> conn_setup;
 };
 
@@ -161,34 +160,25 @@ public:
     from_net(std::string ip="127.0.0.1", int port = 8000)
     : hpda::internal::processor_with_output<OutputObjType>(),
       ip(ip), port(port),
-      net_module_started(false), conn_setup(false), done_transfer(false)
+      net_module_running(false), conn_setup(false), got_end_flag(false)
     {
         init_net_module();
         start_net_module();
     }
 
     ~from_net() {
-        net_module_thrd->join();
-    }
-
-    void start_net_module() {
-        if(!net_module_started){
-           net_module_thrd = new std::thread(std::bind(&from_net::run_net_module, this));
-           net_module_started = true;
-        } else {
-            std::cerr << "net_module already started" << std::endl;
-        }
+        stop_net_module();
     }
 
     bool process() override {
-        if(!net_module_started){
-            start_net_module();
-        }
         while (conn_setup.load()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
-        while(!done_transfer && queue.empty()){
+        while(!got_end_flag.load() && queue.empty()){
             ;
+        }
+        if(got_end_flag.load() && net_module_running){
+            stop_net_module();
         }
         if (queue.empty()) {
             return false;
@@ -220,17 +210,32 @@ protected:
             std::bind(&from_net::on_conn_lost, this, std::placeholders::_1, netn));
     }
 
-    void run_net_module() { 
-        std::thread monitor_thrd(std::bind(&from_net::done_transfer_and_close_conn, this));
-        std::cout << "from_net.server: starting" << std::endl;
-        netn->run();
-        monitor_thrd.join();
+    void start_net_module() {
+        if(!net_module_running){
+            net_module_thrd = new std::thread([&](){
+                std::cout << "from_net.net_module: server starting" << std::endl;
+                netn->run();
+            });
+
+            net_module_running = true;
+        }
+    }
+
+    void stop_net_module() {
+        if(net_module_running){
+            netn->stop();
+            std::cout << "from_net.net_module: server stopping" << std::endl;
+            net_module_thrd->join();
+            delete net_module_thrd;
+            delete netn;
+            net_module_running = false;
+        }
     }
 
     void on_recv_data(std::shared_ptr<NTP_data> nt_data,
                     ff::net::tcp_connection_base *client)
     {
-        std::cout << "receviced one" << std::endl;
+        std::cout << "received one" << std::endl;
         OutputObjType data = nt_data-> template get<payload>();
         queue.enqueue(data);
     }
@@ -239,29 +244,19 @@ protected:
                     ff::net::tcp_connection_base *client)
     {
         std::cout << "got end flag" << std::endl;
-        done_transfer.store(true);
+        got_end_flag.store(true);
     }
 
-    void on_conn_succ(ff::net::tcp_connection_base *server)
+    void on_conn_succ(ff::net::tcp_connection_base *client)
     {
-        ff::net::mout << "connect success, waiting for data ..." << std::endl;
-        
+        ff::net::mout << "from_net.net_module: connect success, waiting for data ..." << std::endl;
+        this->client = client;
     }
 
     void on_conn_lost(ff::net::tcp_connection_base *pConn,
                     ff::net::net_nervure *netn)
     {
-        netn->stop();
-        ff::net::mout << "Client lost, netn closed" << std::endl;
-    }
-
-    void done_transfer_and_close_conn() {
-        while(!done_transfer.load()) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-        // done transfer;
-        netn->stop();
-        std::cout << "monitor_thrd: on transfer done, stopped net_module" << std::endl;
+        ff::net::mout << "from_net.net_module: connection closed" << std::endl;
     }
 
 protected:
@@ -269,11 +264,12 @@ protected:
     int port;
     ff::net::typed_pkg_hub pkghub;
     ff::net::net_nervure *netn;
+    ff::net::tcp_connection_base *client;
     std::thread* net_module_thrd;
 
-    bool net_module_started = false;
+    bool net_module_running = false;
     std::atomic<bool> conn_setup;
-    std::atomic<bool> done_transfer;
+    std::atomic<bool> got_end_flag;
 
     SafeQueue<OutputObjType> queue;
     OutputObjType theObj;

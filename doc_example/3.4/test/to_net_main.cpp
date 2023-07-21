@@ -12,7 +12,13 @@ int main(int argc, char* argv[]) {
         rd.add_data(d);
     }
 
-    to_net<NTO_data_entry> no(&rd, "127.0.0.1", std::stoi(argv[1]));
+    uint port;
+    if (argc == 1){
+        port = 8000;
+    } else {
+        port = std::stoi(argv[1]);
+    }
+    to_net<NTO_data_entry> no(&rd, "127.0.0.1", port);
     no.set_engine(&engine);
 
     engine.run();
