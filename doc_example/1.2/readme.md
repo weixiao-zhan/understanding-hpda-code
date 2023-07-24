@@ -1,0 +1,1 @@
+```bin/helloworld < doc_example/1.2/in.txt```
