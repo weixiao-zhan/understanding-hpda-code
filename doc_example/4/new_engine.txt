@@ -1,0 +1,42 @@
+trace 1:
+      raw data 2 process() -> success, with output [1]
+      raw data 1 process() -> success, with output [0]
+       concat_pp process() -> success, with output [0]
+         sort_pp process() -> failed
+      raw data 1 process() -> success, with output [2]
+       concat_pp process() -> success, with output [2]
+         sort_pp process() -> failed
+      raw data 1 process() -> success, with output [4]
+       concat_pp process() -> success, with output [4]
+         sort_pp process() -> failed
+      raw data 1 process() -> failed
+       concat_pp process() -> success, with output [1]
+         sort_pp process() -> failed
+      raw data 2 process() -> failed
+       concat_pp process() -> failed
+         sort_pp process() -> success, with output [0]
+         sort_pp process() -> success, with output [1]
+         sort_pp process() -> success, with output [2]
+         sort_pp process() -> success, with output [4]
+         sort_pp process() -> failed
+trace 2:
+     raw_data_pp process() -> success, with output [0]
+        split_pp process() -> success
+             mo1 process() -> success, with no output
+             mo2 process() -> success, with no output
+     raw_data_pp process() -> success, with output [1]
+        split_pp process() -> success
+             mo1 process() -> success, with no output
+             mo2 process() -> success, with no output
+     raw_data_pp process() -> success, with output [2]
+        split_pp process() -> success
+             mo1 process() -> success, with no output
+             mo2 process() -> success, with no output
+     raw_data_pp process() -> success, with output [3]
+        split_pp process() -> success
+             mo1 process() -> success, with no output
+             mo2 process() -> success, with no output
+     raw_data_pp process() -> failed
+        split_pp process() -> failed
+             mo1 process() -> failed
+             mo2 process() -> failed
