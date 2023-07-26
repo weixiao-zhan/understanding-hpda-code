@@ -34,7 +34,7 @@ public:
 void trace1() {
     hpda::engine engine;
 
-    raw_data_pp<smpl_ntobj> rd1("rd1"); // [0] [2]
+    raw_data_pp<smpl_ntobj> rd1("raw data 1"); // [0] [2]
     rd1.set_engine(&engine);
     for(int i = 0; i < 4; i+=2) {
         smpl_ntobj t;
@@ -42,7 +42,7 @@ void trace1() {
         rd1.add_data(t);
     }
 
-    raw_data_pp<smpl_ntobj> rd2("rd2"); // [1]
+    raw_data_pp<smpl_ntobj> rd2("raw data 2"); // [1]
     rd2.set_engine(&engine);
     for(int i = 1; i < 3; i+=2) {
         smpl_ntobj t;

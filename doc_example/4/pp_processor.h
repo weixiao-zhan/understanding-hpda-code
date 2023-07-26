@@ -34,7 +34,7 @@ public:
 
     bool process() override
     {
-        std::cout << named_pp<T>::get_name() << " is processing ... ";
+        std::cout << named_pp<T>::get_name() << " process() ";
         bool re = hpda::extractor::internal::raw_data_impl<T>::process();
         if (re)
         {
@@ -48,7 +48,7 @@ public:
         return re;
     }
 
-    //ToDo: consume_input_value()
+    // ToDo: consume_input_value()
 };
 
 template <typename T>
@@ -62,7 +62,7 @@ public:
 
     bool process() override
     {
-        std::cout << named_pp<T>::get_name() << " is processing ... ";
+        std::cout << named_pp<T>::get_name() << " process() ";
         bool re = hpda::processor::internal::concat_impl<T>::process();
         if (re)
         {
@@ -178,7 +178,7 @@ public:
 
     bool process() override
     {
-        std::cout << named_pp<T>::get_name() << " is processing ... ";
+        std::cout << named_pp<T>::get_name() << " process() ";
         bool re = sort<T>::process();
         if (re)
         {
@@ -204,7 +204,7 @@ public:
 
     bool process() override
     {
-        std::cout << named_pp<T>::get_name() << " is processing ... ";
+        std::cout << named_pp<T>::get_name() << " process() ";
         bool re = hpda::processor::internal::split_impl<T>::process();
         if (re)
         {
@@ -229,7 +229,7 @@ public:
 
     bool process() override
     {
-        std::cout << named_pp<T>::get_name() << " is processing ... ";
+        std::cout << named_pp<T>::get_name() << " process() ";
         bool re = hpda::output::internal::memory_output_impl<T>::process();
         if (re)
         {
