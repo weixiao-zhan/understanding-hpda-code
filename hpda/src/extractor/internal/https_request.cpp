@@ -195,7 +195,7 @@ private:
         err = std::string(" (") +
               boost::lexical_cast<std::string>(ERR_GET_LIB(error.value())) +
               "," +
-              boost::lexical_cast<std::string>(ERR_GET_FUNC(error.value())) +
+              boost::lexical_cast<std::string>(ERR_GET_LIB(error.value())) +
               "," +
               boost::lexical_cast<std::string>(ERR_GET_REASON(error.value())) +
               ") ";
