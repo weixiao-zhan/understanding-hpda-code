@@ -8,6 +8,13 @@ bool comp(smpl_ntobj& a, smpl_ntobj& b){
 }
 
 template<>
+struct std::hash<smpl_ntobj> {
+    size_t operator()(const smpl_ntobj& o){
+        return o.get<field0>();
+    }
+};
+
+template<>
 class named_pp<smpl_ntobj>
 {
 std::string name;
@@ -64,7 +71,7 @@ void trace1() {
 void trace2() {
     hpda::engine engine;
 
-    raw_data_pp<smpl_ntobj> rd; // [0] [1]
+    raw_data_pp<smpl_ntobj> rd; // [0] [1] [2] [3]
     rd.set_engine(&engine);
     for(int i = 0; i < 4; i+=1) {
         smpl_ntobj t;
@@ -72,7 +79,7 @@ void trace2() {
         rd.add_data(t);
     }
 
-    split_pp<smpl_ntobj> split(&rd);
+    hash_split_pp<smpl_ntobj> split(&rd);
     split.set_engine(&engine);
 
     memory_output_pp<smpl_ntobj> mo1(split.new_split_stream(), "mo1");

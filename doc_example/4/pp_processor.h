@@ -219,6 +219,45 @@ public:
 };
 
 template <typename T>
+class hash_split_pp : public hpda::processor::internal::split_impl<T>, named_pp<T>
+{
+std::hash<T> hashFunc;
+public:
+    hash_split_pp(hpda::internal::processor_with_output<T> *upper_stream, std::string name = "hash_split_pp")
+        : hpda::processor::internal::split_impl<T>(upper_stream), named_pp<T>(name)
+    {
+    }
+
+    bool process() override
+    {
+        std::cout << named_pp<T>::get_name() << " process() ";
+        bool re = _process();
+        if (re)
+        {
+            std::cout << "-> success" << std::endl;
+        }
+        else
+        {
+            std::cout << "-> failed" << std::endl;
+        }
+        return re;
+    }
+    bool _process()
+    {
+        if (hpda::processor::internal::split_impl<T>::m_streams.empty() || !hpda::processor::internal::split_impl<T>::has_input_value())
+        {
+            return false;
+        }
+        T t = hpda::processor::internal::split_impl<T>::input_value();
+        size_t idx = hashFunc(t) % hpda::processor::internal::split_impl<T>::m_streams.size();
+        hpda::processor::internal::split_impl<T>::m_streams[idx]->add_data(t.make_copy());
+        std::cout << "-> {" << idx << "}-th successor ";
+        hpda::processor::internal::split_impl<T>::consume_input_value();
+        return true;
+    }
+};
+
+template <typename T>
 class memory_output_pp : public hpda::output::internal::memory_output_impl<T>, named_pp<T>
 {
 public:
