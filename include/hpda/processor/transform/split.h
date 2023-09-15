@@ -1,52 +1,25 @@
 #pragma once
 #include <hpda/extractor/raw_data.h>
 #include <hpda/output/output_base.h>
-#include <queue>
+//#include <hpda/processor/processor_base.h>
+
 namespace hpda {
 namespace processor {
 namespace internal {
-template <typename ObjType>
-class split_queue : public hpda::processor::internal::processor_base<ObjType, ObjType> {
-protected:
-std::queue<ObjType> m_queue;
-public:
-  split_queue(hpda::internal::processor_with_output<ObjType> *upper_stream)
-    : hpda::processor::internal::processor_base<ObjType, ObjType>(upper_stream) {
-  }
-
-  bool process() override {
-    if (m_queue.empty()) {
-      return false;
-    }
-    m_queue.pop();
-    if (m_queue.empty()) {
-      return false;
-    }
-    return true;
-  }
-  
-  ObjType output_value() {
-    return m_queue.front();
-  }
-
-  void add_data(const ObjType &obj) {
-    m_queue.push(obj);
-  }
-};
 
 template <typename InputObjType>
 class split_impl : public ::hpda::output::internal::output_base<InputObjType> {
 public:
   typedef ::hpda::output::internal::output_base<InputObjType> base;
-  typedef split_queue<InputObjType> stream_type;
+
+  typedef ::hpda::extractor::internal::raw_data_impl<InputObjType> stream_type;
   split_impl(
       ::hpda::internal::processor_with_output<InputObjType> *upper_stream)
       : ::hpda::output::internal::output_base<InputObjType>(upper_stream) {
   }
 
   ::hpda::internal::processor_with_output<InputObjType> *new_split_stream() {
-    m_streams.push_back(std::unique_ptr<stream_type>(
-      new stream_type((hpda::internal::processor_with_output<InputObjType>*)(this))));
+    m_streams.push_back(std::unique_ptr<stream_type>(new stream_type()));
     auto ret = m_streams.back().get();
     ret->set_engine(base::get_engine());
     ret->add_predecessor(this);
