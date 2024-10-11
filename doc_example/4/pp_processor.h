@@ -272,7 +272,8 @@ public:
         bool re = hpda::output::internal::memory_output_impl<T>::process();
         if (re)
         {
-            std::cout << "-> success, with no output" << std::endl;
+            auto val = hpda::output::internal::memory_output_impl<T>::values().back();
+            std::cout << "-> success, with output [" << named_pp<T>::pp(val) << "]" << std::endl;
         }
         else
         {
